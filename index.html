@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>新年快乐 - 张思佳</title>
+    <style>
+        body, html {
+            margin: 0; padding: 0;
+            width: 100%; height: 100%;
+            overflow: hidden;
+            background-color: #050508; /* 深色背景 */
+        }
+        #canvas { display: block; }
+
+        /* UI层 */
+        .ui-container {
+            position: absolute;
+            top: 45%; left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            width: 100%;
+            pointer-events: none; /* 确保不挡住点击事件 */
+            z-index: 100;
+            color: white;
+            font-family: 'PingFang SC', 'Helvetica Neue', sans-serif;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+        }
+        .name {
+            font-size: 2.8rem;
+            font-weight: bold;
+            text-shadow: 0 0 25px rgba(255,20,147,0.8), 0 0 40px rgba(255,20,147,0.5);
+            margin-bottom: 10px;
+        }
+        .label {
+            color: #ffd700;
+            font-size: 1.1rem;
+            letter-spacing: 3px;
+            margin-bottom: 15px;
+        }
+        #timer {
+            font-size: 3.8rem; /* 稍微大一点 */
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+            text-shadow: 0 0 25px rgba(255,255,255,0.6);
+        }
+        .wish {
+            margin-top: 30px;
+            font-size: 1.2rem;
+            opacity: 0.85;
+            font-style: italic;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="ui-container">
+        <div class="name">张思佳，新年快乐</div>
+        <div class="label">距离 2026 年还有</div>
+        <div id="timer">00:00:00:00</div>
+        <div class="wish">“星河璀璨，万物更新，愿你新的一年皆为所愿。”</div>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+
+        let stars = [];
+        let particles = [];
+        let meteors = [];
+
+        // 初始化画布尺寸和星星
+        function init() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            stars = [];
+            for(let i=0; i<200; i++) {
+                stars.push({
+                    x: Math.random() * width,
+                    y: Math.random() * height,
+                    size: Math.random() * 1.8,
+                    blink: Math.random() * Math.PI * 2 // 随机起始闪烁相位
+                });
+            }
+        }
+
+        // 绘制背景（星空+渐变）
+        function drawBackground() {
+            const grd = ctx.createRadialGradient(width/2, height, 0, width/2, height, height);
+            grd.addColorStop(0, '#1b2735');
+            grd.addColorStop(1, '#090a0f');
+            ctx.fillStyle = grd;
+            ctx.fillRect(0, 0, width, height);
+
+            // 绘制星星
+            ctx.fillStyle = "white";
+            stars.forEach(s => {
+                ctx.globalAlpha = 0.3 + Math.abs(Math.sin(Date.now() * 0.001 + s.blink)) * 0.7; // 更平滑的闪烁
+                ctx.beginPath();
+                ctx.arc(s.x, s.y, s.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1;
+        }
+
+        // 烟花粒子类
+        class Particle {
+            constructor(x, y, hue) {
+                this.x = x; this.y = y;
+                this.hue = hue;
+                this.angle = Math.random() * Math.PI * 2;
+                this.speed = Math.random() * 8 + 2; // 初始速度
+                this.friction = 0.96; // 摩擦力，逐渐减速
+                this.gravity = 0.15; // 重力
+                this.alpha = 1;
+                this.decay = Math.random() * 0.015 + 0.01; // 衰减速度
+                this.history = []; // 轨迹记录
+                this.maxHistory = Math.floor(Math.random() * 8) + 4; // 随机尾巴长度
+            }
+            update() {
+                this.history.push({x: this.x, y: this.y});
+                if(this.history.length > this.maxHistory) this.history.shift();
+                
+                this.speed *= this.friction;
+                this.x += Math.cos(this.angle) * this.speed;
+                this.y += Math.sin(this.angle) * this.speed + this.gravity;
+                this.alpha -= this.decay;
+            }
+            draw() {
+                if(this.history.length < 2) return;
+                ctx.beginPath();
+                ctx.moveTo(this.history[0].x, this.history[0].y);
+                for(let i=1; i<this.history.length; i++) {
+                    ctx.lineTo(this.history[i].x, this.history[i].y);
+                }
+                ctx.strokeStyle = `hsla(${this.hue}, 100%, 70%, ${this.alpha})`; // 尾巴颜色
+                ctx.lineWidth = 2;
+                ctx.lineCap = 'round';
+                ctx.stroke();
+            }
+        }
+
+        // 创建彩色烟花爆炸
+        function createFirework(x, y) {
+            for (let i = 0; i < 60; i++) {
+                // 每个粒子随机一个颜色
+                const randomHue = Math.random() * 360; 
+                particles.push(new Particle(x, y, randomHue));
+            }
+        }
+
+        // 流星类
+        class Meteor {
+            constructor() {
+                this.x = Math.random() * width;
+                this.y = -50; // 从屏幕上方开始
+                this.length = Math.random() * 100 + 50; // 流星长度
+                this.speed = Math.random() * 5 + 3; // 流星速度
+                this.angle = Math.PI / 4 + Math.random() * 0.2; // 45度角左右
+                this.alpha = 1;
+                this.fadeSpeed = 0.008; // 逐渐消失
+            }
+            update() {
+                this.x += Math.cos(this.angle) * this.speed;
+                this.y += Math.sin(this.angle) * this.speed;
+                this.alpha -= this.fadeSpeed;
+            }
+            draw() {
+                ctx.globalAlpha = this.alpha;
+                ctx.strokeStyle = `rgba(255, 255, 255, ${this.alpha})`;
+                ctx.lineWidth = 2;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y);
+                // 绘制流星的尾巴
+                ctx.lineTo(this.x - Math.cos(this.angle) * this.length, this.y - Math.sin(this.angle) * this.length);
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+            }
+        }
+
+        // 主动画循环
+        function animate() {
+            drawBackground(); // 每次刷新都重绘星空
+
+            // 更新和绘制烟花粒子
+            particles.forEach((p, i) => {
+                p.update();
+                p.draw();
+                if (p.alpha <= 0) particles.splice(i, 1);
+            });
+
+            // 更新和绘制流星
+            meteors.forEach((m, i) => {
+                m.update();
+                m.draw();
+                if (m.alpha <= 0 || m.y > height + m.length || m.x > width + m.length) {
+                    meteors.splice(i, 1);
+                }
+            });
+
+            // 自动燃放烟花
+            if (Math.random() < 0.02) createFirework(Math.random() * width, Math.random() * height * 0.6);
+            // 随机生成流星
+            if (Math.random() < 0.015 && meteors.length < 5) { // 控制流星数量
+                meteors.push(new Meteor());
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        // 精准倒计时逻辑
+        function updateTimer() {
+            const target = new Date(2026, 0, 1, 0, 0, 0).getTime(); // 2026年1月1日 00:00:00
+            const now = Date.now();
+            const diff = target - now;
+
+            if (diff <= 0) {
+                document.getElementById('timer').innerText = "HAPPY NEW YEAR!";
+                return;
+            }
+
+            const d = Math.floor(diff / (1000 * 60 * 60 * 24));
+            const h = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            const s = Math.floor((diff % (1000 * 60)) / 1000);
+
+            const pad = (n) => n.toString().padStart(2, '0');
+            document.getElementById('timer').innerText = `${d}天 ${pad(h)}:${pad(m)}:${pad(s)}`;
+        }
+
+        // 交互：点击/触摸位置绽放烟花
+        window.addEventListener('mousedown', e => createFirework(e.clientX, e.clientY));
+        window.addEventListener('touchstart', e => {
+            e.preventDefault(); // 阻止手机端默认的缩放行为
+            createFirework(e.touches[0].clientX, e.touches[0].clientY);
+        });
+        window.addEventListener('resize', init); // 窗口大小改变时重新初始化
+
+        // 启动所有功能
+        init();
+        animate();
+        setInterval(updateTimer, 1000);
+        updateTimer(); // 立即更新一次倒计时，避免页面加载时显示00
+    </script>
+</body>
+</html>
